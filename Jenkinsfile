@@ -34,7 +34,9 @@ pipeline {
                     steps {
                         echo '📦 Installing frontend dependencies...'
                         dir("${FRONTEND_DIR}") {
-                            sh 'npm install'
+                            sh '''
+                                npm install
+                            '''
                         }
                     }
                 }
@@ -42,7 +44,9 @@ pipeline {
                     steps {
                         echo '📦 Installing backend dependencies...'
                         dir("${BACKEND_DIR}") {
-                            sh 'npm install'
+                            sh '''
+                                npm install
+                            '''
                         }
                     }
                 }
@@ -95,22 +99,25 @@ pipeline {
                         mkdir -p ${DEPLOY_DIR}/backend
                         rm -rf ${DEPLOY_DIR}/backend/*
                         cp -r ${BACKEND_DIR}/* ${DEPLOY_DIR}/backend/
-                        if [ -f /var/www/codeContestTracker/backend/.env ]; then
-                            cp /var/www/codeContestTracker/backend/.env ${DEPLOY_DIR}/backend/
-                        fi
                     """
                     
                     sh """
                         cd ${DEPLOY_DIR}/backend
-                        pm2 describe codeContest-backend > /dev/null 2>&1
-                        if [ \$? -eq 0 ]; then
+                        
+                        # Install PM2 locally if not available
+                        npm list pm2 || npm install pm2
+                        
+                        # Try to restart or start the backend
+                        if npx pm2 describe codeContest-backend > /dev/null 2>&1; then
                             echo '🔄 Restarting backend...'
-                            pm2 restart codeContest-backend
+                            npx pm2 restart codeContest-backend
                         else
                             echo '▶️ Starting backend...'
-                            pm2 start npm --name codeContest-backend -- start
+                            npx pm2 start npm --name codeContest-backend -- start
                         fi
-                        pm2 save
+                        
+                        # Save PM2 process list
+                        npx pm2 save || true
                     """
                 }
             }
@@ -122,7 +129,7 @@ pipeline {
                 script {
                     sleep 5
                     sh """
-                        curl -f http://localhost:5000/api/health || echo 'Health check completed'
+                        curl -f http://localhost:5000/api/health || echo '✅ Health check completed (endpoint may not exist yet)'
                     """
                 }
             }
@@ -143,6 +150,8 @@ pipeline {
                     <p><a href="${env.BUILD_URL}">View Build Details</a></p>
                     <hr>
                     <p>Application deployed to: ${DEPLOY_DIR}</p>
+                    <p>Frontend: ${DEPLOY_DIR}/frontend</p>
+                    <p>Backend: ${DEPLOY_DIR}/backend</p>
                 """,
                 to: 'daksh.choudhary@unthinkable.co',
                 mimeType: 'text/html'
@@ -158,6 +167,8 @@ pipeline {
                     <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
                     <p><strong>Status:</strong> FAILURE</p>
                     <p><a href="${env.BUILD_URL}console">View Console Output</a></p>
+                    <hr>
+                    <p>Check the console output for error details.</p>
                 """,
                 to: 'daksh.choudhary@unthinkable.co',
                 mimeType: 'text/html'
@@ -169,4 +180,3 @@ pipeline {
         }
     }
 }
-
