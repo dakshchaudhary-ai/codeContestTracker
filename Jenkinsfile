@@ -27,6 +27,14 @@ pipeline {
                     url: "${GIT_REPO}"
             }
         }
+stage('Security Scan - GitLeaks') {
+    steps {
+        echo '🔐 Running GitLeaks secret scan...'
+        sh '''
+            gitleaks detect --source . --exit-code 1 --redact
+        '''
+    }
+}
         
         stage('Install Dependencies') {
             parallel {
